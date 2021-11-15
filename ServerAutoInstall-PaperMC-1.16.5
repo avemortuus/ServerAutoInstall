@@ -1,0 +1,113 @@
+#!/bin/bash
+# PaperMC 1.16.5 AutoInstall(for Servers)
+
+RED=$(tput setaf 1)
+YELLOW=$(tput setaf 3)
+GREEN=$(tput setaf 2)
+BOLD=$(tput bold)
+RESET=$(tput sgr0)
+
+ServerVersion="1.16.5"
+OpenJDKPackage="openjdk-16-jre-headless"
+
+CreateInstallPath() {
+    echo -e "${YELLOW}${BOLD}----------[root/CreateInstallPath]----------${RESET}"
+    read -p "[CreateInstallPath]Введите название новой директории для сервера: " DirectoryName
+
+    if [ -d $(pwd)/$DirectoryName ]; then
+	echo -e "[CreateInstallPath]Директория с таким именем существует, удаляем..."
+	rm -rf $DirectoryName
+    else
+	echo -e "[CreateInstallPath]Создаем новую директорию: ${YELLOW}$DirectoryName${RESET}"
+    fi
+
+    mkdir $DirectoryName; cd $DirectoryName
+    echo -e "[CreateInstallPath]Директория создана и готова к работе"
+}
+
+DownloadServerJar() {
+    echo -e "${YELLOW}${BOLD}----------[root/DownloadServerJar]----------${RESET}"
+
+    ServerJarURL="https://papermc.io/api/v2/projects/paper/versions/1.16.5/builds/790/downloads/paper-1.16.5-790.jar"
+    
+    echo -e "[DownloadServerJar]Загружаем файл сервера: ${YELLOW}PaperMC-1.16.5.jar${RESET}, подождите..."
+    apt install curl -y &> /dev/null
+    curl -o PaperMC-1.16.5.jar $ServerJarURL &> /dev/null
+    echo -e "[DownloadServerJar]Загружено успешно"
+}
+
+InstallOpenJDK() {
+    echo -e "${YELLOW}${BOLD}----------[root/InstallOpenJDK]----------${RESET}"
+    
+    read -p "[InstallOpenJDK]У Вас установлен пакет ${YELLOW}OpenJDK${RESET}(y or n)? " InstalledJDKStatus
+    read -p "[InstallOpenJDK]Необходимо автоматически установить ${YELLOW}OpenJDK-16${RESET}(y or n)? " NeedInstallStatus
+
+    if [ "$InstalledJDKStatus" == "n" ]; then
+	if [ "$NeedInstallStatus" == "y" ]; then
+	    echo -e "[InstallOpenJDK]Начинаем установку пакета OpenJDK: ${YELLOW}$OpenJDKPackage${RESET}, подождите..."
+	    apt install $OpenJDKPackage -y &> /dev/null
+	    echo -e "[InstallOpenJDK]Теперь установлена необходимая версия OpenJDK"
+	else
+	    echo -e "[InstallOpenJDK]Вы отказались от установки OpenJDK-16, это может вызвать проблемы при запуске сервера"
+	fi
+    else
+	if [ "$NeedInstallStatus" == "y" ]; then
+	    read -p "[InstallOpenJDK]Какой пакет OpenJDK у Вас установлен(например, openjdk-8-jre-headless)? " InstalledOpenJDK
+	    echo -e "[InstallOpenJDK]Сейчас мы удалим ${YELLOW}$InstalledOpenJDK${RESET} и установим ${YELLOW}$OpenJDKPackage${RESET}..."
+	    apt autoremove $InstalledOpenJDK -y &> /dev/null; apt install $OpenJDKPackage -y &> /dev/null
+	    echo -e "[InstallOpenJDK]Теперь установлена необходимая версия OpenJDK"
+	else
+	    echo -e "[InstallOpenJDK]Вы отказались от установки OpenJDK-16, это может вызвать проблемы при запуске сервера"
+	fi
+    fi
+}
+
+CreateEula() {
+    echo -e "${YELLOW}${BOLD}----------[root/CreateEula]----------${RESET}"
+
+    read -p "[CreateEula]Вы хотите автоматически создать модифицированный ${YELLOW}eula.txt${RESET}(y or n)? " CreateStatus
+
+    EulaText="#By changing the setting below to TRUE you are indicating your agreement to our EULA (https://account.mojang.com/documents/minecraft_eula).\n#You also agree that tacos are tasty, and the best food in the world.\n#$(date)\neula=true"
+
+    if [ "$CreateStatus" == "y" ]; then
+	read -p "[CreateEula]Для создания файла необходима специальная ${YELLOW}locale(LC_TIME=en_US.UTF-8)${RESET}. Установлена ли она у Вас(y or n)? " LocaleStatus
+	if [ "$LocaleStatus" == "y" ]; then
+	    echo -e "[CreateEula]Создается модифицированный файл..."
+	    echo -e "$EulaText" >> eula.txt
+	    echo -e "[CreateEula]Файл был успешно создан. Значение eula изменено на true."
+	else
+	    echo -e "[CreateEula]Инструкция по изменению locale содержится в файле README. Модифицированный ${YELLOW}eula.txt${RESET} не будет создан"
+	fi
+    else
+	echo -e "[CreateEula]Вы отказались от создания модифицированного файла ${YELLOW}eula.txt${RESET}"
+    fi
+}
+
+ServerExecutor() {
+    echo -e "${YELLOW}${BOLD}----------[root/ServerExecutor]----------${RESET}"
+
+    echo -e "[ServerExecutor]Будет создан файл run_server. Вы можете использовать его для запуска сервера(sudo ./run_server)"
+    touch run_server; echo -e "java -Xmx4G -Xms2G -jar PaperMC-1.16.5.jar --nogui" >> run_server; chmod +x ./run_server
+
+    echo -e "[ServerExecutor]Файл создан. Запуск сервера..."
+
+    java -Xmx4G -Xms2G -jar PaperMC-1.16.5.jar --nogui
+}
+
+if [ "$EUID" != 0 ]; then
+    echo -e "${RED}${BOLD}Please run with sudo${RESET}"
+    exit
+else
+    echo -e "${YELLOW}${BOLD}----------[root/ServerInstall]----------${RESET}"
+    echo -e "[ServerInstall]Будет установлена версия: ${YELLOW}$ServerVersion${RESET}"
+    echo -e "[ServerInstall]Вызов функции: ${GREEN}CreateInstallPath${RESET}"
+    CreateInstallPath
+    echo -e "[ServerInstall]Вызов функции: ${GREEN}DownloadServerJar${RESET}"
+    DownloadServerJar
+    echo -e "[ServerInstall]Вызов функции: ${GREEN}InstallOpenJDK${RESET}"
+    InstallOpenJDK
+    echo -e "[ServerInstall]Вызов функции: ${GREEN}CreateEula${RESET}"
+    CreateEula
+    echo -e "[ServerInstall]Вызов функции: ${GREEN}ServerExecutor${RESET}"
+    ServerExecutor
+fi
